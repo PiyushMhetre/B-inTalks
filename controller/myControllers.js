@@ -6,27 +6,25 @@ import { Blog } from "../model/Blog.js";
 import { Comment } from "../model/Comment.js";
 import Notification from "../model/Notification.js";
 import { sendNotification, sendPostnotification } from "../index.js";
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 dotenv.config();
-import Fuse from 'fuse.js';
+import Fuse from "fuse.js";
 
-export async function savesPost(req, res){
-  try{
-
+export async function savesPost(req, res) {
+  try {
     const userId = req.body.data;
-    const {blogId} = req.params;
+    const { blogId } = req.params;
     const user = await User.findById(userId);
 
-    if(!user){
-      throw new error("user not found")
+    if (!user) {
+      throw new error("user not found");
     }
 
     const isSaved = user.savedPosts.includes(blogId);
 
-    if(isSaved){
-      user.savedPosts.pull(blogId)
-    }
-    else{
+    if (isSaved) {
+      user.savedPosts.pull(blogId);
+    } else {
       user.savedPosts.push(blogId);
     }
 
@@ -34,15 +32,14 @@ export async function savesPost(req, res){
 
     return res.status(200).json({
       success: true,
-      message: isSaved ? "post removed from saved": "post added to saved",
-      savedPosts: user.savedPosts
-    })
-
-  }catch(error){
+      message: isSaved ? "post removed from saved" : "post added to saved",
+      savedPosts: user.savedPosts,
+    });
+  } catch (error) {
     return res.status(500).json({
-    success: false,
-    message: error.message
-    })    
+      success: false,
+      message: error.message,
+    });
   }
 }
 
@@ -55,14 +52,14 @@ export async function search(req, res) {
       .populate({
         path: "comments",
         populate: { path: "postedBy", select: "name profilePicture" }, // Populate the postedBy field in comments
-      });; // Fetch all blogs
+      }); // Fetch all blogs
 
     // Initialize Fuse.js with options for fuzzy search
     const fuse = new Fuse(blogs, {
       keys: [
         "title",
         "content",
-        { name: "author.name", weight: 0.3 } // Include author.name in search keys with lower weight
+        { name: "author.name", weight: 0.3 }, // Include author.name in search keys with lower weight
       ], // Fields to search
       includeScore: true,
       threshold: 0.4, // Adjust to fine-tune fuzzy matching sensitivity
@@ -76,21 +73,21 @@ export async function search(req, res) {
     return res.status(200).json({
       success: true,
       count: results.length,
-      data: results.map(result => result.item) // Extract matched items from Fuse.js result
+      data: results.map((result) => result.item), // Extract matched items from Fuse.js result
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: 'Failed to search blogs',
-      error: error.message
+      message: "Failed to search blogs",
+      error: error.message,
     });
   }
-};
+}
 
 async function populateNestedComments(comment) {
   await comment.populate({
-    path: 'nestedComments',
-    populate: { path: 'postedBy', select:'name profilePicture' }
+    path: "nestedComments",
+    populate: { path: "postedBy", select: "name profilePicture" },
   });
 
   for (const nestedComment of comment.nestedComments) {
@@ -104,18 +101,16 @@ export async function getBlogById(req, res) {
     const response = await Blog.findById(blogId)
       .populate("author")
       .populate({
-        path : "comments",
-        populate:{path : "postedBy", select: "name profilePicture "}
+        path: "comments",
+        populate: { path: "postedBy", select: "name profilePicture " },
       })
       .exec();
 
-  
     if (response.comments && response.comments.length > 0) {
-        for (const comment of response.comments) {
-          await populateNestedComments(comment);
-        }
+      for (const comment of response.comments) {
+        await populateNestedComments(comment);
       }
-    
+    }
 
     res.status(200).json({
       success: true,
@@ -190,8 +185,8 @@ export async function handleLike(req, res) {
 
     const user = await User.findById(userId);
 
-    if(!user){
-      return res.status(404).json({message:"user not found "})
+    if (!user) {
+      return res.status(404).json({ message: "user not found " });
     }
 
     const blog = await Blog.findById(blogId); // Find the blog by ID
@@ -271,19 +266,19 @@ export async function deleteComment(req, res) {
   }
 }
 
-export async function postComment(req, res) { 
+export async function postComment(req, res) {
   try {
     const { comment, blogId, parentCommentId, userId } = req.body;
 
     const user = await User.findById(userId).select("name profilePicture");
 
     const blog = await Blog.findById(blogId)
-        .populate("author", "name profilePicture")
-        .populate("comments")
-        .populate({
-          path: "comments",
-          populate: { path: "postedBy", select: "name profilePicture" }, 
-        });
+      .populate("author", "name profilePicture")
+      .populate("comments")
+      .populate({
+        path: "comments",
+        populate: { path: "postedBy", select: "name profilePicture" },
+      });
 
     // Create a new comment
     const newComment = new Comment({
@@ -293,7 +288,7 @@ export async function postComment(req, res) {
       parentComment: parentCommentId, // Reference to parent comment (if provided)
     });
 
-    await newComment.save(); 
+    await newComment.save();
 
     // Update the parent comment (if applicable)
     if (parentCommentId) {
@@ -369,7 +364,7 @@ export async function getAllComments(req, res) {
     const blog = await Blog.findById(blogId)
       .populate({
         path: "comments",
-        populate: { path: "postedBy", select: "name profilePicture" } // Include user details for top-level comments
+        populate: { path: "postedBy", select: "name profilePicture" }, // Include user details for top-level comments
       })
       .exec();
 
@@ -406,8 +401,8 @@ export async function getBlogs(req, res) {
     const data = await Blog.find()
       .populate("author")
       .populate({
-        path : "comments",
-        populate:{path : "postedBy", select: "name profilePicture "}
+        path: "comments",
+        populate: { path: "postedBy", select: "name profilePicture " },
       })
       .exec();
 
@@ -497,8 +492,7 @@ export async function login(req, res) {
     }
 
     // Find the user by email
-    const user = await User.findOne({ email })
-    .populate({
+    const user = await User.findOne({ email }).populate({
       path: "notifications",
       populate: [
         {
@@ -585,45 +579,44 @@ export async function authenticate(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId).populate([
       {
-      path: 'savedPosts',
+        path: "savedPosts",
 
-      populate:[ {
-        path: 'comments',
-        populate: {
-          path: 'postedBy',
-          select: 'name profilePicture'
-        }
+        populate: [
+          {
+            path: "comments",
+            populate: {
+              path: "postedBy",
+              select: "name profilePicture",
+            },
+          },
+          { path: "author", select: "name profilePicture" },
+        ],
       },
-      {path: 'author',
-       select : 'name profilePicture'
-      }
-      ]
-      },      
       {
-      path: "notifications",
-      populate: [
-        {
-          path: "fromUser",
-          select: "profilePicture",
-        },
-        // {
-        //   path: "post",
-        //   populate: [
-        //     {
-        //       path: "author",
-        //       select: "name profilePicture",
-        //     },
-        //     {
-        //       path: "comments",
-        //       populate: {
-        //         path: "postedBy",
-        //         select: "name profilePicture",
-        //       },
-        //     },
-        //   ],
-        // },
-      ],
-    }
+        path: "notifications",
+        populate: [
+          {
+            path: "fromUser",
+            select: "profilePicture",
+          },
+          // {
+          //   path: "post",
+          //   populate: [
+          //     {
+          //       path: "author",
+          //       select: "name profilePicture",
+          //     },
+          //     {
+          //       path: "comments",
+          //       populate: {
+          //         path: "postedBy",
+          //         select: "name profilePicture",
+          //       },
+          //     },
+          //   ],
+          // },
+        ],
+      },
     ]);
     // Set the user ID in the req object for further use
     req.userId = decoded.userId;
@@ -760,37 +753,38 @@ export async function updateProfile(req, res) {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { name, college, company, linkedin },
-      { new: true, select: 'name profilePicture college company linkedin' }
+      { new: true, select: "name profilePicture college company linkedin" }
     );
 
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
-        message: 'User not found',
+        message: "User not found",
       });
     }
 
     res.status(200).json({
       success: true,
       user: updatedUser,
-      message: 'Profile updated successfully',
+      message: "Profile updated successfully",
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error("Error updating profile:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update profile',
+      message: "Failed to update profile",
     });
   }
 }
-
 
 export async function forgotPassword(req, res) {
   const { email } = req.body;
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate 6-digit OTP
@@ -800,7 +794,7 @@ export async function forgotPassword(req, res) {
 
     // Configure nodemailer
     const transporter = nodemailer.createTransport({
-      service: 'Gmail',
+      service: "Gmail",
       auth: {
         user: process.env.EMAIL, // Your email
         pass: process.env.EMAIL_PASSWORD, // Your email password
@@ -811,29 +805,33 @@ export async function forgotPassword(req, res) {
     const mailOptions = {
       from: process.env.EMAIL,
       to: email,
-      subject: 'Your OTP Code',
-      text: `Your OTP code is ${otp}`,
+      subject: "Password Reset OTP for INTALKS",
+      text: `Your OTP code for resetting your password on INTALKS is: ${otp}
+If you did not request this password reset, please ignore this email.
+
+Thank you,
+The INTALKS Team`,
     };
 
     await transporter.sendMail(mailOptions);
 
-    res.status(200).json({ success: true, message: 'OTP sent' });
+    res.status(200).json({ success: true, message: "OTP sent" });
   } catch (error) {
-    console.error('Failed to send OTP:', error); // Log the error
+    console.error("Failed to send OTP:", error); // Log the error
     if (error.response) {
       // The request was made and the server responded with a status code
       // that falls out of the range of 2xx
-      console.error('Response data:', error.response.data);
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
+      console.error("Response data:", error.response.data);
+      console.error("Response status:", error.response.status);
+      console.error("Response headers:", error.response.headers);
     } else if (error.request) {
       // The request was made but no response was received
-      console.error('Request data:', error.request);
+      console.error("Request data:", error.request);
     } else {
       // Something happened in setting up the request that triggered an Error
-      console.error('Error message:', error.message);
+      console.error("Error message:", error.message);
     }
-    res.status(500).json({ success: false, message: 'Failed to send OTP' });
+    res.status(500).json({ success: false, message: "Failed to send OTP" });
   }
 }
 
@@ -842,11 +840,15 @@ export async function resetPassword(req, res) {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (user.otp !== req.body.otp || Date.now() > user.otpExpiration) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired OTP" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -855,9 +857,12 @@ export async function resetPassword(req, res) {
     user.otpExpiration = undefined;
     await user.save();
 
-    res.status(200).json({ success: true, message: 'Password reset successfully' });
+    res
+      .status(200)
+      .json({ success: true, message: "Password reset successfully" });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to reset password' });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to reset password" });
   }
 }
-
