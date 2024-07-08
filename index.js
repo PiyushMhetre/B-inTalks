@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import { WebSocketServer } from "ws";
 import jwt from "jsonwebtoken";
 import { User } from "./model/User.js";
+import { parse } from 'url';
 const  app = express();
 
 
@@ -30,35 +31,19 @@ const server = app.listen(4000, () =>{
     console.log("Server Started ")
 })
 
-
-function parseCookie(cookieHeader) {
-  if (!cookieHeader) {
-    return null;
-  }
-
-  const cookies = cookieHeader.split(';');
-  const parsedCookies = {};
-
-  cookies.forEach(cookie => {
-    const parts = cookie.split('=');
-    const key = parts[0].trim();
-    const value = parts[1].trim();
-    parsedCookies[key] = value;
-  });
-
-  return parsedCookies;
-}
 const wss = new WebSocketServer({server})
 const clients = {};
 wss.on('connection', (ws, req) => {
-  const cookieHeader = req.headers.cookie;
-  const token = parseCookie(cookieHeader)?.token;
+  // Extract token from query parameters
+  const queryParams = parse(req.url, true).query;
+  const token = queryParams.token;
+
   // Verify the token and extract userId
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const userId = decoded.userId;
-      
+
       if (userId) {
         clients[userId] = ws;
 
@@ -81,6 +66,8 @@ wss.on('connection', (ws, req) => {
     ws.close(4000, 'Token not provided');
   }
 });
+
+
 export const sendNotification = async (userId, notification) => {
   const user = await User.findById(userId);
   user.notifications.push(notification);
