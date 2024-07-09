@@ -14,7 +14,7 @@ const  app = express();
 app.use(cors({
   origin: 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allow these methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
+  allowedHeaders: ['Content-Type', 'Authorization', 'Upgrade', 'Connection', 'Origin'], // Allow these headers
   credentials: true // Allow cookies to be sent cross-origin
 }));
 
