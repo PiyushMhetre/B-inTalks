@@ -35,6 +35,7 @@ const wss = new WebSocketServer({server})
 const clients = {};
 wss.on('connection', (ws, req) => {
   // Extract token from query parameters
+  console.log("req is hit for making websokcet")
   const queryParams = parse(req.url, true).query;
   const token = queryParams.token;
 
