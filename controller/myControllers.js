@@ -215,7 +215,7 @@ export async function handleLike(req, res) {
 
       const blogOwnerId = updatedBlog.author.toString();
 
-      // if (blogOwnerId != userId) {
+      if (blogOwnerId != userId) {
       const notification = new Notification({
         user: updatedBlog.author,
         type: "like",
@@ -226,7 +226,7 @@ export async function handleLike(req, res) {
 
       await notification.save();
       sendNotification(blogOwnerId, notification);
-      // }
+      }
 
       return res.status(200).json({ message: "Like successful", updatedBlog });
     }
@@ -298,7 +298,7 @@ export async function postComment(req, res) {
       });
 
       //notification
-      // if (parentComment.postedBy.toString() !== userId) {
+      if (parentComment.postedBy.toString() !== userId) {
       const parentCommentUser = await User.findById(parentComment.postedBy);
       const notification = new Notification({
         user: parentCommentUser._id,
@@ -311,7 +311,7 @@ export async function postComment(req, res) {
 
       await notification.save();
       sendNotification(parentCommentUser._id, notification);
-      // }
+      }
     }
 
     // Update the blog schema (using middleware is recommended, see below)
@@ -326,7 +326,7 @@ export async function postComment(req, res) {
       const blogOwnerId = blogOwner.author._id.toString();
 
       // Notify the blog owner
-      // if (blogOwnerId !== userId) {
+      if (blogOwnerId !== userId) {
       const notification = new Notification({
         user: blogOwnerId,
         type: "comment",
@@ -338,7 +338,7 @@ export async function postComment(req, res) {
 
       await notification.save();
       sendNotification(blogOwnerId, notification);
-      // }
+      }
     }
 
     res.status(200).json({
@@ -633,7 +633,7 @@ export async function authenticate(req, res, next) {
 
 export async function postBlog(req, res) {
   try {
-    let userId = req.userId;
+    const userId = req.userId;
     const blogOwner = await User.findById(userId)
       .select("name profilePicture")
       .exec();
@@ -657,7 +657,7 @@ export async function postBlog(req, res) {
         user: blogOwner._id,
         type: "newBlog",
         message: `New blog by ${blogOwner.name} : ${title}, check it out !`,
-        post: newBlog,
+        post: newBlog._id,
         fromUser: blogOwner,
         createdAt: new Date(),
         read: false,
@@ -677,7 +677,9 @@ export async function postBlog(req, res) {
     await notification.save();
     const allUsers = await User.find();
     for (const user of allUsers) {
+      if(user._id.toString()!==  userId){
       await sendPostnotification(user._id, notification);
+      }
     }
 
     return res.status(201).json({
