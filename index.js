@@ -84,9 +84,6 @@ export const sendPostnotification = async (userId, notification) => {
 
     // Check if the user exists and if they have enabled notifications for this type
     if (user) {
-      user.notifications.push(notification);
-      await user.save();
-
       // Send notification via WebSocket if client connection exists
       if (clients[userId]) {
         clients[userId].send(JSON.stringify(notification));

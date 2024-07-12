@@ -21,6 +21,7 @@ import {
   updateProfile,  
   forgotPassword,
   resetPassword,
+  verifyOtp,
 } from "../controller/myControllers.js";
 
 const router = express.Router();
@@ -68,7 +69,7 @@ res.clearCookie("token", {
 
 router.put('/updateProfile', updateProfile);
 router.post('/forgotpassword', forgotPassword);
-
+router.post('/verify-otp', verifyOtp );
 router.put('/resetPassword', resetPassword);
 
 

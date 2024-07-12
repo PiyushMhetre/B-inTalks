@@ -124,7 +124,7 @@ export async function updateNotification(req, res) {
     const userId = req.body.data;
     await Notification.updateMany(
       { user: userId, read: false },
-      { read: true }
+      { $set: { read: true } }
     );
 
     res.status(200);
@@ -299,18 +299,18 @@ export async function postComment(req, res) {
 
       //notification
       if (parentComment.postedBy.toString() !== userId) {
-      const parentCommentUser = await User.findById(parentComment.postedBy);
-      const notification = new Notification({
-        user: parentCommentUser._id,
-        type: "comment_reply",
-        message: `${user.name} replied to your comment.`,
-        post: blogId,
-        fromUser: user,
-        comment: newComment._id,
-      });
+        const parentCommentUser = await User.findById(parentComment.postedBy);
+        const notification = new Notification({
+          user: parentCommentUser._id,
+          type: "comment_reply",
+          message: `${user.name} replied to your comment.`,
+          post: blogId,
+          fromUser: user,
+          comment: newComment._id,
+        });
 
-      await notification.save();
-      sendNotification(parentCommentUser._id, notification);
+        await notification.save();
+        sendNotification(parentCommentUser._id, notification);
       }
     }
 
@@ -337,6 +337,7 @@ export async function postComment(req, res) {
       });
 
       await notification.save();
+      
       sendNotification(blogOwnerId, notification);
       }
     }
@@ -426,8 +427,7 @@ export async function getBlogs(req, res) {
       message: "Failed to fetch data",
     });
   }
-}
-export async function signUp(req, res) {
+}export async function signUp(req, res) {
   try {
     const { name, email, password, college, company, linkedin } = req.body;
 
@@ -440,20 +440,66 @@ export async function signUp(req, res) {
 
     // Check if the email already exists
     const existingUser = await User.findOne({ email });
+
     if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: "User already exists",
-      });
+      if (existingUser.isVerified) {
+        return res.status(409).json({
+          success: false,
+          message: "User already exists",
+        });
+      } else {
+        // If user exists but is not verified, update their details and resend OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiration = Date.now() + 3600000; // OTP valid for 1 hour
+
+        // Update existing user record with new OTP and other details
+        existingUser.name = name;
+        existingUser.password = await bcrypt.hash(password, 10);
+        existingUser.college = college;
+        existingUser.company = company;
+        existingUser.linkedin = linkedin;
+        existingUser.otp = otp;
+        existingUser.otpExpiration = otpExpiration;
+        existingUser.isVerified = false; // Ensure isVerified is set to false
+
+        await existingUser.save();
+
+        // Configure nodemailer
+        const transporter = nodemailer.createTransport({
+          service: "Gmail",
+          auth: {
+            user: process.env.EMAIL, // Your email
+            pass: process.env.EMAIL_PASSWORD, // Your email password
+          },
+        });
+
+        // Send email with OTP
+        const mailOptions = {
+          from: process.env.EMAIL,
+          to: email,
+          subject: "Verify your email for INTALKS",
+          text: `Your OTP code for verifying your email on INTALKS is: ${otp}
+If you did not sign up for this account, please ignore this email.
+
+Thank you,
+The INTALKS Team`,
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        // Respond with success message
+        return res.status(200).json({
+          success: true,
+          message: "User details updated successfully. Please verify your email.",
+        });
+      }
     }
 
-    // Hash the password
+    // If the user does not exist, create a new user record
     const hashedPassword = await bcrypt.hash(password, 10);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiration = Date.now() + 3600000; // OTP valid for 1 hour
 
-    // Assign default role ("Member") to new users
-    const role = "Member";
-
-    // Create a new user record
     const newUser = await User.create({
       name,
       email,
@@ -461,14 +507,38 @@ export async function signUp(req, res) {
       college,
       company,
       linkedin,
-      role,
+      otp,
+      otpExpiration,
+      isVerified: false,
     });
 
-    // Respond with success message and user data
+    // Configure nodemailer
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.EMAIL, // Your email
+        pass: process.env.EMAIL_PASSWORD, // Your email password
+      },
+    });
+
+    // Send email with OTP
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to: email,
+      subject: "Verify your email for INTALKS",
+      text: `Your OTP code for verifying your email on INTALKS is: ${otp}
+If you did not sign up for this account, please ignore this email.
+
+Thank you,
+The INTALKS Team`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    // Respond with success message
     res.status(200).json({
       success: true,
-      message: "User created successfully",
-      user: newUser,
+      message: "User created successfully. Please verify your email.",
     });
   } catch (error) {
     console.error("Error during signup:", error);
@@ -524,6 +594,10 @@ export async function login(req, res) {
         success: false,
         message: "Invalid email or password",
       });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({ success: false, message: 'User not verified' });
     }
 
     req.userId = user._id;
@@ -630,7 +704,6 @@ export async function authenticate(req, res, next) {
     });
   }
 }
-
 export async function postBlog(req, res) {
   try {
     const userId = req.userId;
@@ -648,39 +721,43 @@ export async function postBlog(req, res) {
     const { title, content, type } = req.body;
 
     const newBlog = new Blog({ author: userId, title, content, type });
-
     await newBlog.save();
 
-    let notification;
-    if (type === "blog") {
-      notification = new Notification({
-        user: blogOwner._id,
-        type: "newBlog",
-        message: `New blog by ${blogOwner.name} : ${title}, check it out !`,
-        post: newBlog._id,
-        fromUser: blogOwner,
-        createdAt: new Date(),
-        read: false,
-      });
-    } else {
-      notification = new Notification({
-        user: blogOwner._id,
-        type: "newQnA",
-        message: `${blogOwner.name} has asked for help with: "${content}". Please contribute your insights if you can.`,
-        post: newBlog._id,
-        fromUser: blogOwner,
-        createdAt: new Date(),
-        read: false,
-      });
-    }
-
-    await notification.save();
     const allUsers = await User.find();
-    for (const user of allUsers) {
-      if(user._id.toString()!==  userId){
-      await sendPostnotification(user._id, notification);
+    const notificationPromises = allUsers.map(async (user) => {
+      if (user._id.toString() !== userId) {
+        let notification;
+        if (type === "blog") {
+          notification = new Notification({
+            user: user._id,
+            type: "newBlog",
+            message: `New blog by ${blogOwner.name} : ${title}, check it out !`,
+            post: newBlog._id,
+            fromUser: blogOwner,
+            createdAt: new Date(),
+            read: false,
+          });
+        } else {
+          notification = new Notification({
+            user: user._id,
+            type: "newQnA",
+            message: `${blogOwner.name} has asked for help with: "${content}". Please contribute your insights if you can.`,
+            post: newBlog._id,
+            fromUser: blogOwner,
+            createdAt: new Date(),
+            read: false,
+          });
+        }
+
+        await notification.save();
+        user.notifications.push(notification);
+        await user.save();
+        await sendPostnotification(user._id.toString(), notification);
       }
-    }
+    });
+
+    // Wait for all notifications to be sent
+    await Promise.all(notificationPromises);
 
     return res.status(201).json({
       success: true,
@@ -691,6 +768,7 @@ export async function postBlog(req, res) {
     res.status(500).json({ success: false, message: "Failed to save Blog" });
   }
 }
+
 
 export async function deleteBlog(req, res) {
   try {
@@ -866,5 +944,42 @@ export async function resetPassword(req, res) {
     res
       .status(500)
       .json({ success: false, message: "Failed to reset password" });
+  }
+}
+
+export async function verifyOtp(req, res) {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (user.otp !== otp || user.otpExpiration < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    // Mark user as verified
+    user.isVerified = true;
+    user.otp = undefined; // Clear OTP
+    user.otpExpiration = undefined; // Clear OTP expiration
+    await user.save();
+    res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+    });
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify OTP, please try again",
+    });
   }
 }
