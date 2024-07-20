@@ -216,16 +216,16 @@ export async function handleLike(req, res) {
       const blogOwnerId = updatedBlog.author.toString();
 
       if (blogOwnerId != userId) {
-      const notification = new Notification({
-        user: updatedBlog.author,
-        type: "like",
-        message: `${user.name} liked your post.`,
-        post: blogId,
-        fromUser: user,
-      });
+        const notification = new Notification({
+          user: updatedBlog.author,
+          type: "like",
+          message: `${user.name} liked your post.`,
+          post: blogId,
+          fromUser: user,
+        });
 
-      await notification.save();
-      sendNotification(blogOwnerId, notification);
+        await notification.save();
+        sendNotification(blogOwnerId, notification);
       }
 
       return res.status(200).json({ message: "Like successful", updatedBlog });
@@ -327,18 +327,18 @@ export async function postComment(req, res) {
 
       // Notify the blog owner
       if (blogOwnerId !== userId) {
-      const notification = new Notification({
-        user: blogOwnerId,
-        type: "comment",
-        message: `${user.name} commented on your post.`,
-        post: blogId,
-        fromUser: user,
-        comment: newComment._id,
-      });
+        const notification = new Notification({
+          user: blogOwnerId,
+          type: "comment",
+          message: `${user.name} commented on your post.`,
+          post: blogId,
+          fromUser: user,
+          comment: newComment._id,
+        });
 
-      await notification.save();
-      
-      sendNotification(blogOwnerId, notification);
+        await notification.save();
+
+        sendNotification(blogOwnerId, notification);
       }
     }
 
@@ -490,7 +490,8 @@ The INTALKS Team`,
         // Respond with success message
         return res.status(200).json({
           success: true,
-          message: "User details updated successfully. Please verify your email.",
+          message:
+            "User details updated successfully. Please verify your email.",
         });
       }
     }
@@ -597,7 +598,9 @@ export async function login(req, res) {
     }
 
     if (!user.isVerified) {
-      return res.status(403).json({ success: false, message: 'User not verified' });
+      return res
+        .status(403)
+        .json({ success: false, message: "User not verified" });
     }
 
     req.userId = user._id;
@@ -768,7 +771,6 @@ export async function postBlog(req, res) {
     res.status(500).json({ success: false, message: "Failed to save Blog" });
   }
 }
-
 
 export async function deleteBlog(req, res) {
   try {
