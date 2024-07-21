@@ -674,7 +674,7 @@ export async function authenticate(req, res, next) {
         populate: [
           {
             path: "fromUser",
-            select: "profilePicture",
+            select: " name profilePicture",
           },
           // {
           //   path: "post",
